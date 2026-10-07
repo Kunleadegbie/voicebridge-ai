@@ -1,0 +1,7 @@
+# Sprint 2C: official N-ATLAS ASR local inference (Whisper Small family)
+# Install after backend/requirements.txt.
+torch>=2.4,<3
+transformers>=4.44,<5
+huggingface-hub>=0.24
+numpy>=1.26,<3
+safetensors>=0.4

@@ -1,0 +1,26 @@
+﻿{
+    "total_interactions":  20,
+    "documented_natlas_voice_interactions":  0,
+    "validation_target":  50,
+    "validation_progress_percent":  0.0,
+    "average_helpfulness":  5.0,
+    "understood_percent":  100.0,
+    "by_language":  {
+                        "en-NG":  14,
+                        "ha-NG":  4,
+                        "ig-NG":  1,
+                        "yo-NG":  1
+                    },
+    "by_journey":  {
+                       "LOAN":  1,
+                       "OTHER":  7,
+                       "SAVE":  1,
+                       "SCAM":  9,
+                       "SME":  1,
+                       "TERM":  1
+                   },
+    "by_source":  {
+                      "text_test":  10,
+                      "voice":  10
+                  }
+}

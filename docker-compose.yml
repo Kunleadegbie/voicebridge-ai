@@ -1,0 +1,33 @@
+services:
+  natlas:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    ipc: host
+    restart: unless-stopped
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+      VLLM_API_KEY: ${VLLM_API_KEY}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+      - vllm-cache:/root/.cache/vllm
+    command:
+      - --model
+      - ${MODEL_ID:-NCAIR1/N-ATLaS}
+      - --served-model-name
+      - ${MODEL_ID:-NCAIR1/N-ATLaS}
+      - --dtype
+      - auto
+      - --max-model-len
+      - ${MAX_MODEL_LEN:-4096}
+      - --gpu-memory-utilization
+      - ${GPU_MEMORY_UTILIZATION:-0.90}
+      - --generation-config
+      - vllm
+      - --api-key
+      - ${VLLM_API_KEY}
+
+volumes:
+  hf-cache:
+  vllm-cache:

@@ -1,0 +1,8 @@
+# Optional dependencies ONLY for running the full N-ATLAS 8B LLM locally.
+# Install the normal requirements first.
+torch>=2.4
+transformers>=4.44
+accelerate>=0.34
+safetensors>=0.4
+huggingface-hub>=0.24
+psutil>=6.0
