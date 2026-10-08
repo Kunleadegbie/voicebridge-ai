@@ -1,9 +1,197 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VoiceBridge AI</title><link rel="stylesheet" href="/static/styles.css"></head>
-<body><main class="card"><div class="brand">VoiceBridge AI <span class="version">Sprint 2C</span></div><h1>Financial knowledge in your language. By voice.</h1><p class="sub">Simple financial education for everyday Nigerians. Low-bandwidth mobile voice prototype using official N-ATLAS ASR models. Development recordings do not count toward validation.</p>
-<label>Language<select id="language"><option value="en-NG">Nigerian English</option><option value="yo-NG">Yorùbá</option><option value="ha-NG">Hausa</option><option value="ig-NG">Igbo</option></select></label>
-<div class="journeys"><span>Loans</span><span>Scams</span><span>Savings</span><span>Banking safety</span><span>Small business</span><span>Financial terms</span></div>
-<button id="record" class="mic">🎙️<span>Tap to speak</span></button><p id="status">Ready</p>
-<section id="result" hidden><small id="inputLabel">Your question</small><blockquote id="transcript"></blockquote><small>VoiceBridge</small><p id="answer"></p><div id="badges"></div><div class="feedbackBox"><p>Was this helpful?</p><button class="feedback" data-score="5">👍 Yes</button><button class="feedback" data-score="1">👎 No</button><p id="feedbackStatus"></p></div></section>
-<details><summary>Developer text test</summary><textarea id="testText">Someone called me and said they are from my bank. They asked me to tell them the OTP that came to my phone. Should I give it to them?</textarea><button id="textTest">Run text smoke test</button><p class="warning">Developer text tests are permanently excluded from NAIC voice-validation counts.</p></details>
-<section class="dashboard"><div><strong id="total">—</strong><small>Total tests</small></div><div><strong id="eligible">— / 50</strong><small>N-ATLAS voice validation</small></div><div><strong id="helpful">—</strong><small>Avg. helpfulness</small></div></section>
-<footer>Prototype for NAIC 2026 • Integration provenance is recorded for every interaction.</footer></main><script src="/static/recorder.js"></script><script src="/static/app.js"></script></body></html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>VoiceBridge AI | Financial Knowledge by Voice</title>
+
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+  <main class="card">
+
+    <!-- Brand -->
+    <div class="brand">
+      VoiceBridge AI
+      <span class="version">Sprint 2C</span>
+    </div>
+
+    <!-- Introduction -->
+    <h1>Financial knowledge in your language. By voice.</h1>
+
+    <p class="sub">
+      Simple financial education for everyday Nigerians.
+      A low-bandwidth, mobile-friendly voice prototype using
+      official N-ATLAS ASR models.
+      Development recordings do not count toward validation.
+    </p>
+
+    <!-- Language selection -->
+    <label for="language">Language</label>
+
+    <select id="language">
+      <option value="en-NG">Nigerian English</option>
+      <option value="yo-NG">Yor&#249;b&#225;</option>
+      <option value="ha-NG">Hausa</option>
+      <option value="ig-NG">Igbo</option>
+    </select>
+
+    <!-- Financial education topics -->
+    <div class="journeys">
+      <span>Loans</span>
+      <span>Scams</span>
+      <span>Savings</span>
+      <span>Banking safety</span>
+      <span>Small business</span>
+      <span>Financial terms</span>
+    </div>
+
+    <!-- Microphone recording -->
+    <button
+      id="record"
+      class="mic"
+      type="button"
+      aria-label="Tap to speak"
+    >
+      &#127908;
+      <span>Tap to speak</span>
+    </button>
+
+    <p id="status" role="status" aria-live="polite">Ready</p>
+
+    <!-- Answer section -->
+    <section id="result" hidden>
+
+      <small id="inputLabel">Your question</small>
+
+      <blockquote id="transcript"></blockquote>
+
+      <small>VoiceBridge</small>
+
+      <p id="answer"></p>
+
+      <!-- Spoken answer controls -->
+      <div
+        class="audio-controls"
+        aria-label="Spoken answer controls"
+      >
+
+        <button
+          id="playAnswer"
+          type="button"
+          disabled
+        >
+          &#128266; Listen to answer
+        </button>
+
+        <button
+          id="stopAnswer"
+          type="button"
+          disabled
+        >
+          &#9209; Stop speaking
+        </button>
+
+        <label for="autoSpeak">
+          <input
+            id="autoSpeak"
+            type="checkbox"
+            checked
+          >
+          Speak automatically
+        </label>
+
+        <p
+          id="speechStatus"
+          role="status"
+          aria-live="polite"
+        ></p>
+
+      </div>
+
+      <!-- Model and validation information -->
+      <div id="badges"></div>
+
+      <!-- User feedback -->
+      <div class="feedbackBox">
+
+        <p>Was this helpful?</p>
+
+        <button
+          class="feedback"
+          type="button"
+          data-score="5"
+        >
+          &#128077; Yes
+        </button>
+
+        <button
+          class="feedback"
+          type="button"
+          data-score="1"
+        >
+          &#128078; No
+        </button>
+
+        <p id="feedbackStatus"></p>
+
+      </div>
+
+    </section>
+
+    <!-- Developer testing -->
+    <details>
+
+      <summary>Developer text test</summary>
+
+      <textarea id="testText">Someone called me and said they are from my bank. They asked me to tell them the OTP that came to my phone. Should I give it to them?</textarea>
+
+      <button id="textTest" type="button">
+        Run text smoke test
+      </button>
+
+      <p class="warning">
+        Developer text tests are permanently excluded
+        from NAIC voice-validation counts.
+      </p>
+
+    </details>
+
+    <!-- Validation dashboard -->
+    <section class="dashboard">
+
+      <div>
+        <strong id="total">&#8212;</strong>
+        <small>Total tests</small>
+      </div>
+
+      <div>
+        <strong id="eligible">&#8212; / 50</strong>
+        <small>N-ATLAS voice validation</small>
+      </div>
+
+      <div>
+        <strong id="helpful">&#8212;</strong>
+        <small>Avg. helpfulness</small>
+      </div>
+
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      Prototype for NAIC 2026 &#8226;
+      Integration provenance is recorded for every interaction.
+    </footer>
+
+  </main>
+
+  <!-- JavaScript: each file loaded exactly once -->
+  <script src="/static/recorder.js"></script>
+  <script src="/static/speech.js"></script>
+  <script src="/static/app.js"></script>
+
+</body>
+</html>

@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 
 RULES = [
@@ -46,6 +47,23 @@ RULES = [
             r"savings",
             r"budget",
             r"emergency fund",
+
+            # Yoruba savings expressions
+            r"fi\s+owo\s+pamo",
+            r"fifi\s+owo\s+pamo",
+            r"owo\s+pamo",
+            r"fipamo",
+
+            # Hausa savings expressions
+            r"ajiye\s+kudi",
+            r"ajiyar\s+kudi",
+            r"tara\s+kudi",
+            r"\bajiy[ae]\b",
+            r"\bjiya\s+ku[dr]i\b",
+
+            # Igbo savings expressions
+            r"ichekwa\s+ego",
+            r"chekwaa\s+ego",
         ],
     ),
     (
@@ -82,7 +100,12 @@ def classify_journey(text: str) -> str:
     VoiceBridge financial-literacy journeys.
     """
 
-    t = text.lower().strip()
+    # Normalize accented and unaccented ASR output for matching.
+    t = unicodedata.normalize("NFKD", text.lower().strip())
+    t = "".join(
+        char for char in t
+        if not unicodedata.combining(char)
+    )
 
     # Normalize common ASR renderings of security acronyms.
     # Examples:

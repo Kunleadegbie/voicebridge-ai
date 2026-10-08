@@ -44,35 +44,153 @@ def _messages(text: str, journey: str, language: str) -> list[dict[str, str]]:
 
 
 async def _generate_api(text: str, journey: str, language: str) -> str:
+    import asyncio
+    import time
+
     if not settings.natlas_llm_url:
-        raise NAtlasLLMError("NATLAS_LLM_URL is required when NATLAS_LLM_MODE=api.")
+        raise NAtlasLLMError(
+            "NATLAS_LLM_URL is required when NATLAS_LLM_MODE=api."
+        )
 
-    headers = {"Content-Type": "application/json"}
-    if settings.natlas_llm_api_key:
-        headers["Authorization"] = f"Bearer {settings.natlas_llm_api_key}"
+    if not settings.natlas_llm_api_key:
+        raise NAtlasLLMError(
+            "NATLAS_LLM_API_KEY is required for Runpod Serverless."
+        )
 
-    # OpenAI-compatible request shape. If NCAIR supplies a different contract,
-    # only this adapter needs to change.
+    # Accept a Runpod endpoint base URL or its /run URL.
+    base_url = settings.natlas_llm_url.rstrip("/")
+    if base_url.endswith("/run"):
+        base_url = base_url[:-4]
+
+    if not base_url.startswith("https://api.runpod.ai/v2/"):
+        raise NAtlasLLMError(
+            "NATLAS_LLM_URL must be a Runpod Serverless endpoint URL."
+        )
+
+    messages = _messages(text, journey, language)
+
+    # Runpod vLLM endpoint uses a completion-style prompt.
+    # Preserve the system and user instructions.
+    prompt = (
+        f"System instructions:\n{messages[0]['content']}\n\n"
+        f"User request:\n{messages[1]['content']}\n\n"
+        "Assistant response:\n"
+    )
+
     payload = {
-        "model": settings.natlas_model_name,
-        "messages": _messages(text, journey, language),
-        "temperature": settings.natlas_temperature,
-        "max_tokens": settings.natlas_max_new_tokens,
+        "input": {
+            "prompt": prompt,
+            "sampling_params": {
+                "max_tokens": settings.natlas_max_new_tokens,
+                "temperature": settings.natlas_temperature,
+            },
+        }
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=settings.natlas_request_timeout_seconds) as client:
-            response = await client.post(settings.natlas_llm_url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise NAtlasLLMError(f"N-ATLAS LLM API request failed: {exc}") from exc
+    headers = {
+        "Authorization": f"Bearer {settings.natlas_llm_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    # Allow sufficient time for Runpod cold starts and queued jobs.
+    deadline = time.monotonic() + max(
+        360,
+        settings.natlas_request_timeout_seconds,
+    )
 
     try:
-        return data["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError, AttributeError) as exc:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=20.0)
+        ) as client:
+
+            submission = await client.post(
+                f"{base_url}/run",
+                headers=headers,
+                json=payload,
+            )
+            submission.raise_for_status()
+            job = submission.json()
+
+            job_id = job.get("id")
+            if not job_id:
+                raise NAtlasLLMError(
+                    f"Runpod did not return a job ID: {job}"
+                )
+
+            while True:
+                status = job.get("status")
+
+                if status == "COMPLETED":
+                    try:
+                        output = job["output"]
+
+                        if isinstance(output, list):
+                            result = output[0]
+                        elif isinstance(output, dict):
+                            result = output
+                        else:
+                            raise TypeError("Unexpected output structure")
+
+                        choices = result["choices"]
+                        choice = choices[0]
+
+                        answer = choice.get("text")
+
+                        if answer is None:
+                            answer = choice["message"]["content"]
+
+                        answer = answer.strip()
+
+                        if not answer:
+                            raise ValueError("Empty model response")
+
+                        return answer
+
+                    except (
+                        KeyError,
+                        IndexError,
+                        TypeError,
+                        AttributeError,
+                        ValueError,
+                    ) as exc:
+                        raise NAtlasLLMError(
+                            "Runpod completed but returned an invalid "
+                            "N-ATLAS response."
+                        ) from exc
+
+                if status in {"FAILED", "CANCELLED", "TIMED_OUT"}:
+                    raise NAtlasLLMError(
+                        f"Runpod N-ATLAS job ended with status: {status}. "
+                        f"Details: {job.get('error', 'Not provided')}"
+                    )
+
+                if status not in {
+                    "IN_QUEUE",
+                    "IN_PROGRESS",
+                    "RUNNING",
+                }:
+                    raise NAtlasLLMError(
+                        f"Unexpected Runpod job status: {status}"
+                    )
+
+                if time.monotonic() >= deadline:
+                    raise NAtlasLLMError(
+                        "Runpod N-ATLAS request exceeded the "
+                        "configured overall wait time."
+                    )
+
+                await asyncio.sleep(3)
+
+                response = await client.get(
+                    f"{base_url}/status/{job_id}",
+                    headers=headers,
+                )
+                response.raise_for_status()
+                job = response.json()
+
+    except (httpx.HTTPError, ValueError) as exc:
         raise NAtlasLLMError(
-            "N-ATLAS LLM API response did not match the configured OpenAI-compatible adapter."
+            f"Runpod N-ATLAS API request failed: {exc}"
         ) from exc
 
 
