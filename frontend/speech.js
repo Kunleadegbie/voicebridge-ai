@@ -10,6 +10,7 @@
   let cachedBlob = null;
   let requestController = null;
   let generation = 0;
+  let authorizedInteraction = null;
 
   function setStatus(message) {
     get("speechStatus").textContent = message;
@@ -45,7 +46,13 @@
       return;
     }
 
-    const key = JSON.stringify([language, text]);
+    if (!authorizedInteraction) {
+      setStatus("Speech authorization is unavailable. Please ask a new question.");
+      return;
+    }
+
+    const { interaction_id, speech_token } = authorizedInteraction;
+    const key = JSON.stringify([interaction_id, speech_token]);
     stopPlayback();
     const currentGeneration = generation;
 
@@ -61,8 +68,7 @@
         const response = await fetch("/tts/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, language }),
-          signal: requestController.signal
+          body: JSON.stringify({ interaction_id, speech_token }), signal: requestController.signal
         });
 
         if (!response.ok) {
@@ -115,7 +121,17 @@
     onAnswer(data, language) {
       clearAudio();
 
+      authorizedInteraction =
+        data.interaction_id && data.speech_token
+          ? {
+              interaction_id: data.interaction_id,
+              speech_token: data.speech_token
+            }
+          : null;
+
       const text = data.response || "";
+
+
       const supported = supportedLanguages.has(language);
 
       get("playAnswer").disabled = !supported || !text;
@@ -145,8 +161,6 @@
   });
 
   get("language").addEventListener("change", () => {
-    clearAudio();
-    get("playAnswer").disabled = true;
-    setStatus("");
+    clearAudio(); authorizedInteraction = null; get("playAnswer").disabled = true; setStatus("");
   });
 })();

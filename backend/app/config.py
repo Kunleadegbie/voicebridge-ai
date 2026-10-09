@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     app_name: str = "VoiceBridge AI"
     environment: str = "development"
     database_url: str = "sqlite:///./voicebridge.db"
+    tts_hourly_limit: int = 30
+    tts_daily_limit: int = 100
 
     # Official N-ATLAS ASR. Keep pending until NCAIR provides the documented interface.
     natlas_asr_mode: str = "pending"  # pending | local | api
@@ -27,8 +29,13 @@ class Settings(BaseSettings):
     natlas_max_new_tokens: int = 280
     natlas_temperature: float = 0.1
     natlas_request_timeout_seconds: int = 120
+    enable_text_test: bool = False
 
     max_audio_mb: int = 12
+
+    # Secret used to sign short-lived speech authorization tokens.
+    speech_token_secret: str = ""
+
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", extra="ignore")
 
 settings = Settings()

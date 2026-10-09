@@ -5,3 +5,12 @@ __pycache__/
 *.db
 *.pyc
 .DS_Store
+
+# VoiceBridge generated speech audio
+backend/audio_cache/
+
+# VoiceBridge AI speech-generation usage counters
+backend/speech_usage.db
+backend/speech_usage.db-journal
+backend/speech_usage.db-shm
+backend/speech_usage.db-wal

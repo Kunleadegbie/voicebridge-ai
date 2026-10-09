@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 class VoiceAnswer(BaseModel):
     interaction_id: str
+    speech_token: str
     language: str
     transcript: str
     journey: str
