@@ -131,6 +131,24 @@ async def _generate_api(text: str, journey: str, language: str) -> str:
                         flush=True,
                     )
                     previous_status = status
+                
+                if status == "COMPLETED":
+                    total_elapsed_ms = round(
+                        (time.monotonic() - request_started) * 1000
+                    )
+
+                    queue_delay_ms = job.get("delayTime")
+                    execution_time_ms = job.get("executionTime")
+
+                    print(
+                        "[N-ATLAS PERFORMANCE] "
+                        f"total_elapsed_ms={total_elapsed_ms} | "
+                        f"runpod_delay_ms={queue_delay_ms} | "
+                        f"runpod_execution_ms={execution_time_ms} | "
+                        f"max_output_tokens={settings.natlas_max_new_tokens}",
+                        flush=True,
+                    )
+
 
                 if status == "COMPLETED":
                     print(
