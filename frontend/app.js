@@ -2,14 +2,46 @@ const $=id=>document.getElementById(id); let currentId=null,currentSource='text_
 $('record').onclick=()=>toggleRecording($('record'));
 function render(data){currentId=data.interaction_id;currentSource=data.interaction_source;$('result').hidden=false;$('inputLabel').textContent=currentSource==='voice'?'I heard':'Your question';$('transcript').textContent=data.transcript;$('answer').textContent=data.response;$('badges').innerHTML=`<span class="badge">${data.journey}</span><span class="badge">ASR: ${data.asr_provider.toUpperCase()}</span>${data.asr_model_id?`<span class="badge">${data.asr_model_id.split('/').pop()}</span>`:''}<span class="badge">LLM: ${data.llm_provider.toUpperCase()}</span><span class="badge ${data.validation_eligible?'eligible':''}">${data.validation_eligible?'VALIDATION ELIGIBLE':'TEST ONLY'}</span>`;$('status').textContent='Complete';
 $('feedbackStatus').textContent='';
+$('asrCorrect').value = '';
 refreshSummary();
 
 if (window.voiceBridgeSpeech) {
   window.voiceBridgeSpeech.onAnswer(data, $('language').value);
 }
 }
-async function sendAudio(blob){$('status').textContent='Processing voice…';let f=new FormData();f.append('audio',blob,'voice.wav');f.append('language',$('language').value);f.append('session_id',localStorage.vbSession||(localStorage.vbSession=crypto.randomUUID()));f.append('real_user','false');let r=await fetch('/voice/ask',{method:'POST',body:f});let d=await r.json();if(!r.ok){$('status').textContent=d.detail||'Voice request failed';return;}render(d);}
+async function sendAudio(blob){$('status').textContent='Processing voice…';let f=new FormData();f.append('audio',blob,'voice.wav');f.append('language',$('language').value);f.append('session_id',localStorage.vbSession||(localStorage.vbSession=crypto.randomUUID()));f.append('real_user', $('participantMode').checked ? 'true' : 'false');let r=await fetch('/voice/ask',{method:'POST',body:f});let d=await r.json();if(!r.ok){$('status').textContent=d.detail||'Voice request failed';return;}render(d);}
 $('textTest').onclick=async()=>{let text=$('testText').value.trim();if(!text)return;let r=await fetch('/text/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,language:$('language').value,session_id:'developer-text-test'})});let d=await r.json();if(!r.ok){$('status').textContent=d.detail||'Test failed';return;}render(d);};
-document.querySelectorAll('.feedback').forEach(b=>b.onclick=async()=>{if(!currentId)return;let r=await fetch('/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interaction_id:currentId,understood:true,helpful:Number(b.dataset.score),asr_correct:currentSource==='voice'?true:null})});$('feedbackStatus').textContent=r.ok?'Thank you — feedback saved.':'Feedback could not be saved.';refreshSummary();});
+document.querySelectorAll('.feedback').forEach(b => b.onclick = async () => {
+  if (!currentId) return;
+
+  const asrSelection = $('asrCorrect').value;
+
+  if (currentSource === 'voice' && asrSelection === '') {
+    $('feedbackStatus').textContent =
+      'Please indicate whether VoiceBridge correctly heard your question.';
+    return;
+  }
+
+  const payload = {
+    interaction_id: currentId,
+    understood: null,
+    helpful: Number(b.dataset.score),
+    asr_correct: currentSource === 'voice'
+      ? asrSelection === 'true'
+      : null
+  };
+
+  const r = await fetch('/feedback', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+
+  $('feedbackStatus').textContent = r.ok
+    ? 'Thank you - feedback saved.'
+    : 'Feedback could not be saved.';
+
+  if (r.ok) refreshSummary();
+});
 async function refreshSummary(){try{let r=await fetch('/interactions/summary');let d=await r.json();$('total').textContent=d.total_interactions;$('eligible').textContent=`${d.documented_natlas_voice_interactions} / ${d.validation_target}`;$('helpful').textContent=d.average_helpfulness??'—';}catch(e){}}
 refreshSummary();

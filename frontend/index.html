@@ -49,6 +49,30 @@
       <span>Financial terms</span>
     </div>
 
+    <!-- Participant validation mode -->
+    <section class="validation-mode">
+      <label for="participantMode">
+        <input
+          id="participantMode"
+          type="checkbox"
+        >
+        I am participating in a genuine VoiceBridge AI user test
+      </label>
+
+      <p class="sub">
+        Select this only if you are a real participant testing
+        VoiceBridge AI. Developer demonstrations and automated
+        tests must leave this unchecked.
+      </p>
+
+      <p class="sub">
+        Do not share account numbers, PINs, passwords, OTPs,
+        BVNs or other sensitive financial information.
+        Your question and feedback may be recorded for evaluation.
+      </p>
+    </section>
+
+
     <!-- Microphone recording -->
     <button
       id="record"
@@ -118,7 +142,17 @@
       <!-- User feedback -->
       <div class="feedbackBox">
 
-        <p>Was this helpful?</p>
+        <p>Did VoiceBridge correctly hear your question?</p>
+
+        <label for="asrCorrect">
+          <select id="asrCorrect">
+            <option value="">Please select</option>
+            <option value="true">Yes, my question was correctly understood</option>
+            <option value="false">No, my question was not correctly understood</option>
+          </select>
+        </label>
+
+        <p>Was VoiceBridge's answer helpful?</p>
 
         <button
           class="feedback"
