@@ -1,4 +1,5 @@
 
+import asyncio
 import time
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
@@ -17,8 +18,14 @@ from app.services.language import normalize_language
 from app.services.safety import redact, safety_suffix, precheck
 from app.services.speech_auth import create_speech_token
 
+from app.services.voice_usage import (
+    reserve_voice_request,
+    VoiceLimitExceeded,
+)
+
 
 router = APIRouter()
+voice_processing_lock = asyncio.Lock()
 
 
 def is_validation_eligible(
@@ -166,6 +173,7 @@ async def process_text(
     "/voice/ask",
     response_model=VoiceAnswer,
 )
+
 async def ask_voice(
     audio: UploadFile = File(...),
     language: str = Form("en-NG"),
@@ -181,33 +189,47 @@ async def ask_voice(
             detail="Audio file is too large",
         )
 
-    try:
-        result = await transcribe(
-            raw,
-            audio.filename or "voice.wav",
-            audio.content_type or "audio/wav",
-            normalize_language(language),
-        )
-    except (
-        ASRNotConfigured,
-        NAtlasASRError,
-        AudioPreprocessError,
-    ) as exc:
+    if voice_processing_lock.locked():
         raise HTTPException(
-            status_code=503,
-            detail=str(exc),
+            status_code=429,
+            detail="Voice processing is busy. Please try again shortly.",
         )
 
-    return await process_text(
-        result.transcript,
-        language,
-        session_id,
-        db,
-        source="voice",
-        asr_result=result,
-        real_user=real_user,
-    )
+    async with voice_processing_lock:
+        try:
+            reserve_voice_request()
+        except VoiceLimitExceeded as exc:
+            raise HTTPException(
+                status_code=429,
+                detail=str(exc),
+            ) from exc
 
+        try:
+            result = await transcribe(
+                raw,
+                audio.filename or "voice.wav",
+                audio.content_type or "audio/wav",
+                normalize_language(language),
+            )
+        except (
+            ASRNotConfigured,
+            NAtlasASRError,
+            AudioPreprocessError,
+        ) as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+            ) from exc
+
+        return await process_text(
+            result.transcript,
+            language,
+            session_id,
+            db,
+            source="voice",
+            asr_result=result,
+            real_user=real_user,
+        )
 
 @router.post(
     "/text/test",

@@ -67,6 +67,9 @@ async def _generate_api(text: str, journey: str, language: str) -> str:
             "NATLAS_LLM_URL must be a Runpod Serverless endpoint URL."
         )
 
+    request_started = time.monotonic()
+    previous_status = None
+
     messages = _messages(text, journey, language)
 
     # Runpod vLLM endpoint uses a completion-style prompt.
@@ -119,6 +122,23 @@ async def _generate_api(text: str, journey: str, language: str) -> str:
 
             while True:
                 status = job.get("status")
+
+                if status != previous_status:
+                    elapsed = time.monotonic() - request_started
+                    print(
+                        f"[N-ATLAS LLM] Runpod status={status} "
+                        f"elapsed={elapsed:.1f}s",
+                        flush=True,
+                    )
+                    previous_status = status
+
+                if status == "COMPLETED":
+                    print(
+                        "[N-ATLAS LLM] Runpod metrics: "
+                        f"delayTime={job.get('delayTime')} ms, "
+                        f"executionTime={job.get('executionTime')} ms",
+                        flush=True,
+                    )
 
                 if status == "COMPLETED":
                     try:
