@@ -1,5 +1,4 @@
-﻿runpod>=1.7,<2
-torch>=2.4,<2.6
+runpod>=1.7,<2
 transformers>=4.44,<4.49
 huggingface-hub>=0.24,<1
 numpy>=1.26,<2

@@ -16,6 +16,10 @@ WORKDIR /workspace
 
 COPY deployment/runpod-asr/build/requirements.txt ./requirements.txt
 
+RUN python3 -m pip install --no-cache-dir \
+    torch==2.5.1+cu124 \
+    --index-url https://download.pytorch.org/whl/cu124
+
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 COPY deployment/runpod-asr/build/worker.py ./worker.py
