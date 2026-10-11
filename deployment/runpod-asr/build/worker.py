@@ -71,6 +71,8 @@ def handler(job):
         }
 
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         return {
             "error": f"ASR processing failed: {type(exc).__name__}"
         }
