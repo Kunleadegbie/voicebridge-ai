@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     tts_daily_limit: int = 100
 
     # Official N-ATLAS ASR. Keep pending until NCAIR provides the documented interface.
-    natlas_asr_mode: str = "pending"  # pending | local | api
+    natlas_asr_mode: str = "pending"  # pending | local | api | runpod
     natlas_asr_url: str = ""
     natlas_asr_api_key: str = ""
     natlas_asr_device: str = "auto"  # auto | cpu
