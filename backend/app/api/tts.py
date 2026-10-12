@@ -101,7 +101,7 @@ def speak(
     # Step 7: Handle unexpected speech-provider errors.
     except Exception as exc:
         print(
-            f"[TTS ERROR] {type(exc).__name__}: speech generation failed",
+            f"[TTS ERROR] {type(exc).__name__}: HTTP {getattr(exc, chr(115)+chr(116)+chr(97)+chr(116)+chr(117)+chr(115)+chr(95)+chr(99)+chr(111)+chr(100)+chr(101), None)}",
             flush=True,
         )
         raise HTTPException(
