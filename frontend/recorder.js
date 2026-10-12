@@ -1,6 +1,7 @@
 let vbStream=null, vbContext=null, vbSource=null, vbProcessor=null, vbChunks=[], vbRecording=false;
 
 function mergeFloat32(chunks){let n=chunks.reduce((a,c)=>a+c.length,0),out=new Float32Array(n),o=0;for(const c of chunks){out.set(c,o);o+=c.length;}return out;}
+function normalizeQuietCapture(samples){let peak=0;for(let i=0;i<samples.length;i++)peak=Math.max(peak,Math.abs(samples[i]));if(peak<0.001)return false;if(peak<0.05){let gain=Math.min(10,0.12/peak);for(let i=0;i<samples.length;i++)samples[i]=Math.max(-1,Math.min(1,samples[i]*gain));}return true;}
 function writeStr(v,o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
 function wavBlob(samples,sampleRate){let b=new ArrayBuffer(44+samples.length*2),v=new DataView(b);writeStr(v,0,'RIFF');v.setUint32(4,36+samples.length*2,true);writeStr(v,8,'WAVE');writeStr(v,12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);writeStr(v,36,'data');v.setUint32(40,samples.length*2,true);let o=44;for(let i=0;i<samples.length;i++,o+=2){let s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(o,s<0?s*0x8000:s*0x7fff,true);}return new Blob([b],{type:'audio/wav'});}
 
@@ -19,6 +20,8 @@ async function stopVB(button){
  vbRecording=false; vbProcessor&&vbProcessor.disconnect(); vbSource&&vbSource.disconnect(); vbStream&&vbStream.getTracks().forEach(t=>t.stop());
  let samples=mergeFloat32(vbChunks), rate=vbContext.sampleRate; await vbContext.close(); vbContext=null;
  button.classList.remove('recording'); button.querySelector('span').textContent='Tap to speak';
+ const isIOSInput = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+ if(isIOSInput && !normalizeQuietCapture(samples)){document.getElementById('status').textContent='I could not detect your voice. Check microphone permission, speak closer to the iPad, and try again.';return;}
  sendAudio(wavBlob(samples,rate));
 }
 async function toggleRecording(button){try{if(vbRecording)await stopVB(button);else await startVB(button);}catch(e){document.getElementById('status').textContent='Microphone error: '+e.message;}}
