@@ -3,6 +3,9 @@
   const get = (id) => document.getElementById(id);
 
   const supportedLanguages = new Set(["en-NG", "yo-NG", "ig-NG", "ha-NG"]);
+  const isIOS =
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   let player = null;
   let audioUrl = null;
@@ -31,6 +34,10 @@
 
   function clearAudio() {
     stopPlayback();
+    if (player) {
+      player.pause();
+      player.remove();
+    }
     player = null;
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
@@ -89,14 +96,38 @@
 
       if (generation !== currentGeneration) return;
 
+      if (player) {
+        player.pause();
+        player.remove();
+      }
       player = new Audio(audioUrl);
-
+      player.onplay = () => {
+        if (generation === currentGeneration) {
+          setStatus("Playing spoken answer...");
+          get("stopAnswer").disabled = false;
+        }
+      };
       player.onended = () => {
         if (generation === currentGeneration) {
           setStatus("Finished speaking.");
           get("stopAnswer").disabled = true;
         }
       };
+
+      if (isIOS) {
+        // iOS Safari blocks playback that starts after an async fetch.
+        // Show native controls so playback starts from a fresh user tap.
+        player.controls = true;
+        player.preload = "metadata";
+        player.setAttribute("playsinline", "");
+        player.style.display = "block";
+        player.style.width = "100%";
+        player.style.marginTop = "8px";
+        get("speechStatus").insertAdjacentElement("afterend", player);
+        setStatus("Audio ready. Tap Listen to answer or ▶ on the audio player.");
+        get("stopAnswer").disabled = false;
+        return;
+      }
 
       setStatus("Playing spoken answer...");
       await player.play();
@@ -151,6 +182,14 @@
   };
 
   get("playAnswer").addEventListener("click", () => {
+    if (isIOS && player && audioUrl) {
+      player.play().then(() => {
+        setStatus("Playing spoken answer...");
+      }).catch(() => {
+        setStatus("Tap ▶ on the audio player to play the answer.");
+      });
+      return;
+    }
     speakAnswer(get("answer").textContent, get("language").value);
   });
 
