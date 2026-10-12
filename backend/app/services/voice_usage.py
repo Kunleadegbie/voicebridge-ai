@@ -7,7 +7,7 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[2] / "speech_usage.db"
 
-VOICE_HOURLY_LIMIT = 10
+VOICE_HOURLY_LIMIT = 50
 VOICE_DAILY_LIMIT = 30
 
 
