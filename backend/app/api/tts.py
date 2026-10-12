@@ -99,7 +99,11 @@ def speak(
         )
 
     # Step 7: Handle unexpected speech-provider errors.
-    except Exception:
+    except Exception as exc:
+        print(
+            f"[TTS ERROR] {type(exc).__name__}: speech generation failed",
+            flush=True,
+        )
         raise HTTPException(
             status_code=502,
             detail="Speech generation is temporarily unavailable",
