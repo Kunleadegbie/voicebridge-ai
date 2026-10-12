@@ -275,9 +275,11 @@ async def process_voice_job(
     session_id: str,
     real_user: bool,
 ):
-    db = SessionLocal()
+    db = None
 
     try:
+        db = SessionLocal()
+
         async with voice_processing_lock:
             reserve_voice_request()
 
@@ -315,7 +317,8 @@ async def process_voice_job(
         )
 
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 @router.post("/voice/submit", status_code=202)
