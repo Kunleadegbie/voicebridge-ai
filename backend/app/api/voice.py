@@ -254,3 +254,142 @@ async def text_test(
         asr_result=None,
         real_user=False,
     )
+
+from fastapi.encoders import jsonable_encoder
+from app.db.database import SessionLocal
+from app.services.voice_jobs import (
+    create_job,
+    get_job,
+    complete_job,
+    fail_job,
+)
+
+
+
+async def process_voice_job(
+    job_id: str,
+    raw: bytes,
+    filename: str,
+    content_type: str,
+    language: str,
+    session_id: str,
+    real_user: bool,
+):
+    db = None
+
+    try:
+        db = SessionLocal()
+
+        async with voice_processing_lock:
+            reserve_voice_request()
+
+            result = await transcribe(
+                raw,
+                filename,
+                content_type,
+                normalize_language(language),
+            )
+
+            answer = await process_text(
+                result.transcript,
+                language,
+                session_id,
+                db,
+                source="voice",
+                asr_result=result,
+                real_user=real_user,
+            )
+
+        complete_job(
+            job_id,
+            jsonable_encoder(answer),
+        )
+
+    except Exception as exc:
+        print(
+            f"[VOICE JOB] {job_id} failed: {exc}",
+            flush=True,
+        )
+        fail_job(
+            job_id,
+            "Voice processing could not be completed. "
+            "Please contact the test coordinator.",
+        )
+
+    finally:
+        if db is not None:
+            db.close()
+
+
+@router.post("/voice/submit", status_code=202)
+async def submit_voice(
+    audio: UploadFile = File(...),
+    language: str = Form("en-NG"),
+    session_id: str = Form("web"),
+    real_user: bool = Form(False),
+):
+    raw = await audio.read()
+
+    if not raw:
+        raise HTTPException(
+            status_code=400,
+            detail="Audio recording is empty.",
+        )
+
+    if len(raw) > settings.max_audio_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail="Audio file is too large.",
+        )
+
+    try:
+        job_id = create_job()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+        ) from exc
+
+    asyncio.create_task(
+        process_voice_job(
+            job_id,
+            raw,
+            audio.filename or "voice.wav",
+            audio.content_type or "audio/wav",
+            language,
+            session_id,
+            real_user,
+        )
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "processing",
+    }
+
+
+@router.get("/voice/status/{job_id}")
+async def voice_job_status(job_id: str):
+    job = get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Voice request not found.",
+        )
+
+    if job.status == "completed":
+        return {
+            "status": "completed",
+            "result": job.result,
+        }
+
+    if job.status == "failed":
+        return {
+            "status": "failed",
+            "error": job.error,
+        }
+
+    return {
+        "status": "processing",
+    }

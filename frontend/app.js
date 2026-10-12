@@ -74,59 +74,145 @@ function render(data) {
 }
 
 // Submit a recorded voice question
+let voiceRequestPending = false;
+
+async function waitForVoiceJob(jobId) {
+  if (sessionStorage.getItem('vbVoiceJobTimedOut') === jobId) {
+    $('status').textContent =
+      'Your previous request exceeded the waiting period. ' +
+      'Please contact the test coordinator before recording again.';
+    return;
+  }
+
+  for (let attempt = 0; attempt < 150; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    try {
+      const response = await fetch(
+        '/voice/status/' + encodeURIComponent(jobId),
+        { cache: 'no-store' }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          sessionStorage.removeItem('vbPendingVoiceJob');
+          sessionStorage.removeItem('vbVoiceJobTimedOut');
+          $('status').textContent =
+            'Your previous voice request is no longer available. ' +
+            'Please record your question again.';
+          return;
+        }
+        continue;
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'completed') {
+        sessionStorage.removeItem('vbPendingVoiceJob');
+          sessionStorage.removeItem('vbVoiceJobTimedOut');
+        render(data.result);
+        return;
+      }
+
+      if (data.status === 'failed') {
+        sessionStorage.removeItem('vbPendingVoiceJob');
+          sessionStorage.removeItem('vbVoiceJobTimedOut');
+        $('status').textContent =
+          data.error || 'Voice processing failed.';
+        return;
+      }
+
+      $('status').textContent =
+        'N-ATLAS is processing your question. Please wait...';
+
+    } catch (error) {
+      console.warn('Voice polling issue:', error);
+      $('status').textContent =
+        'Reconnecting to your voice request. Please wait...';
+    }
+  }
+
+  sessionStorage.setItem('vbVoiceJobTimedOut', jobId);
+
+  $('status').textContent =
+    'Your request is taking longer than expected. ' +
+    'Please contact the test coordinator before recording again.';
+}
+
 async function sendAudio(blob) {
-  $('status').textContent = 'Processing voice…';
+  if (voiceRequestPending) {
+    $('status').textContent =
+      'Your previous question is still being processed.';
+    return;
+  }
+
+  const existingJob = sessionStorage.getItem('vbPendingVoiceJob');
+
+  if (existingJob) {
+    $('status').textContent =
+      'Recovering your previous voice request...';
+    voiceRequestPending = true;
+    try {
+      await waitForVoiceJob(existingJob);
+    } finally {
+      voiceRequestPending = false;
+    }
+    return;
+  }
+
+  voiceRequestPending = true;
+  $('status').textContent = 'Submitting your voice question...';
 
   const form = new FormData();
-
   form.append('audio', blob, 'voice.wav');
   form.append('language', $('language').value);
-
   form.append(
     'session_id',
     localStorage.vbSession ||
       (localStorage.vbSession = crypto.randomUUID())
   );
-
   form.append(
     'real_user',
     $('participantMode').checked ? 'true' : 'false'
   );
 
   try {
-    const response = await fetch('/voice/ask', {
+    const response = await fetch('/voice/submit', {
       method: 'POST',
       body: form
     });
 
-    let data;
-
-    try {
-      data = await response.json();
-    } catch (error) {
-      throw new Error('The server returned an unreadable response.');
-    }
+    const data = await response.json();
 
     if (!response.ok) {
       $('status').textContent =
         typeof data.detail === 'string'
           ? data.detail
-          : 'Voice processing failed. Please contact the test coordinator.';
+          : 'Voice submission failed.';
       return;
     }
 
-    render(data);
+    if (!data.job_id) {
+      throw new Error('The server did not return a job ID.');
+    }
+
+    sessionStorage.setItem('vbPendingVoiceJob', data.job_id);
+
+    $('status').textContent =
+      'Recording received. N-ATLAS is preparing your answer...';
+
+    await waitForVoiceJob(data.job_id);
 
   } catch (error) {
     console.error('Voice request error:', error);
 
     $('status').textContent =
-      'The connection was interrupted before your answer could be displayed. ' +
-      'Your question may still have been processed. ' +
-      'Please contact the test coordinator before trying again.';
+      'Connection interrupted. Please contact the test ' +
+      'coordinator before submitting another recording.';
+  } finally {
+    voiceRequestPending = false;
   }
 }
-
 // Developer text testing
 $('textTest').onclick = async () => {
   const text = $('testText').value.trim();
@@ -243,3 +329,24 @@ async function refreshSummary() {
 
 // Initial dashboard load
 refreshSummary();
+
+
+async function recoverPendingVoiceJob() {
+  const jobId = sessionStorage.getItem('vbPendingVoiceJob');
+
+  if (!jobId || voiceRequestPending) {
+    return;
+  }
+
+  voiceRequestPending = true;
+  $('status').textContent =
+    'Restoring your previous voice request. Please wait...';
+
+  try {
+    await waitForVoiceJob(jobId);
+  } finally {
+    voiceRequestPending = false;
+  }
+}
+
+recoverPendingVoiceJob();

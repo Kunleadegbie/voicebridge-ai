@@ -104,15 +104,100 @@ async def _transcribe_api(raw: bytes, filename: str, content_type: str, language
         asr_latency_ms=int((time.perf_counter() - start) * 1000),
     )
 
+async def _transcribe_runpod(raw: bytes, filename: str, content_type: str, language: str) -> ASRResult:
+    import base64
+
+    if not settings.natlas_asr_url:
+        raise ASRNotConfigured("RunPod ASR mode requires NATLAS_ASR_URL.")
+    if not settings.natlas_asr_api_key:
+        raise ASRNotConfigured("RunPod ASR mode requires NATLAS_ASR_API_KEY.")
+
+    lang = canonical_language(language)
+    endpoint = settings.natlas_asr_url.rstrip("/")
+    headers = {
+        "Authorization": f"Bearer {settings.natlas_asr_api_key}",
+        "Content-Type": "application/json",
+    }
+    request_body = {
+        "input": {
+            "audio_base64": base64.b64encode(raw).decode("ascii"),
+            "language": lang,
+        }
+    }
+
+    start = time.perf_counter()
+    timeout = settings.natlas_asr_timeout_seconds
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            f"{endpoint}/run",
+            headers=headers,
+            json=request_body,
+        )
+        response.raise_for_status()
+        job = response.json()
+
+        job_id = job.get("id")
+        if not job_id:
+            raise NAtlasASRError("RunPod did not return a job ID.")
+
+        deadline = time.monotonic() + timeout
+
+        while time.monotonic() < deadline:
+            status_response = await client.get(
+                f"{endpoint}/status/{job_id}",
+                headers=headers,
+            )
+            status_response.raise_for_status()
+            status = status_response.json()
+            state = status.get("status")
+
+            if state == "COMPLETED":
+                output = status.get("output") or {}
+                if not isinstance(output, dict):
+                    raise NAtlasASRError("RunPod returned an invalid ASR output.")
+
+                if output.get("error"):
+                    raise NAtlasASRError(
+                        f"RunPod ASR worker error: {output['error']}"
+                    )
+
+                transcript = (output.get("text") or "").strip()
+                if not transcript:
+                    raise NAtlasASRError("RunPod returned an empty transcript.")
+
+                return ASRResult(
+                    transcript=transcript,
+                    provider="natlas",
+                    model_id=output.get("model") or model_for(lang)["model_id"],
+                    mode="runpod",
+                    language=lang,
+                    duration_ms=int(output.get("duration_ms") or 0),
+                    asr_latency_ms=int((time.perf_counter() - start) * 1000),
+                )
+
+            if state in ("FAILED", "CANCELLED", "TIMED_OUT"):
+                raise NAtlasASRError(
+                    f"RunPod ASR job ended with status {state}."
+                )
+
+            await asyncio.sleep(2)
+
+    raise NAtlasASRError(
+        "RunPod ASR timed out while waiting for transcription."
+    )
+
 async def transcribe(audio: bytes, filename: str, content_type: str, language: str) -> ASRResult:
     mode = settings.natlas_asr_mode.lower().strip()
     if mode == "local":
         return await asyncio.to_thread(_transcribe_local_sync, audio, filename, content_type, language)
     if mode == "api":
         return await _transcribe_api(audio, filename, content_type, language)
+    if mode == "runpod":
+        return await _transcribe_runpod(audio, filename, content_type, language)
     raise ASRNotConfigured(
         "N-ATLAS ASR is not enabled. Set NATLAS_ASR_MODE=local for the official Hugging Face models, "
-        "or api when an official hosted service is supplied."
+        "or api for an existing hosted service, or runpod for RunPod Serverless."
     )
 
 
